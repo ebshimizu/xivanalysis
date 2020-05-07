@@ -7,7 +7,9 @@ import OGCDDowntime from './OGCDDowntime'
 import Positionals from './Positionals'
 import Procs from './Procs'
 //import RotationWatchdog from './RotationWatchdog'
+import {Tincture} from 'parser/core/modules/Tincture'
 import Weaving from './Weaving'
+
 export default [
 	BloodOfTheDragon,
 	Buffs,
@@ -18,5 +20,6 @@ export default [
 	Positionals,
 	Procs,
 	//RotationWatchdog, // TODO - Restore this module after making it actually correct for ShB
+	Tincture,
 	Weaving,
 ]
