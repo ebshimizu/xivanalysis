@@ -194,7 +194,7 @@ export default class Buffs extends Module {
 
 		if (data.length > 0) {
 			this.statistics.add(new PieChartStatistic({
-				headings: ['Used Life Surge On', 'Count', '%'],
+				headings: ['Life Surge Consumer', 'Count', '%'],
 				data,
 			}))
 		}
