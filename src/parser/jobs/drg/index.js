@@ -22,6 +22,11 @@ export default new Meta({
 		{user: CONTRIBUTORS.RIETTY, role: ROLES.DEVELOPER},
 	],
 	changelog: [{
+		date: new Date('2020-12-27'),
+		Changes: () => <>Added chart for Life Surge uses, updated bad GCD logic.</>,
+		contributors: [CONTRIBUTORS.FALINDRITH],
+	},
+	{
 		date: new Date('2020-12-17'),
 		Changes: () => <>Updated Buff Window logic and suggestions for Lance Charge and Dragon Sight.</>,
 		contributors: [CONTRIBUTORS.FALINDRITH],
