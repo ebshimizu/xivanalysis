@@ -44,19 +44,17 @@ const CHART_LIFE_SURGE_CONSUMERS: number[] = [
 
 const CHART_COLORS: {[actionId: number]: string} = {
 	[ACTIONS.FULL_THRUST.id]: '#0e81f7',
-	[ACTIONS.FANG_AND_CLAW.id]: '#18cee7',
-	[ACTIONS.WHEELING_THRUST.id]: '#ce1010',
-	[ACTIONS.COERTHAN_TORMENT.id]: '#9452ff',
+	[ACTIONS.FANG_AND_CLAW.id]: '#b36b00',
+	[ACTIONS.WHEELING_THRUST.id]: '#b36b00',
+	[ACTIONS.COERTHAN_TORMENT.id]: '#b36b00',
 }
 
-const OTHER_ACTION_COLOR: string = '#616161'
+const OTHER_ACTION_COLOR: string = '#660000'
 
 export default class Buffs extends Module {
 	static handle = 'buffs'
 	static title = t('drg.buffs.title')`Buffs`
 
-	private badLifeSurges: number = 0
-	private fifthGcd: boolean = false
 	private soloDragonSight: boolean = false
 	private lifeSurgeCasts: number[] = []
 
@@ -81,21 +79,6 @@ export default class Buffs extends Module {
 				// add to cast list
 				this.lifeSurgeCasts.push(action.id)
 			}
-
-			if (BAD_LIFE_SURGE_CONSUMERS.includes(action.id)) {
-				this.fifthGcd = false // Reset the 4-5 combo hit flag on other GCDs
-				if (this.combatants.selected.hasStatus(STATUSES.LIFE_SURGE.id)) {
-					this.badLifeSurges++
-				}
-			} else if (FINAL_COMBO_HITS.includes(action.id)) {
-				if (!this.fifthGcd) {
-					// If we get 2 of these in a row (4-5 combo hits), only the first one is considered bad, so set a flag to ignore the next one
-					this.fifthGcd = true
-					if (this.combatants.selected.hasStatus(STATUSES.LIFE_SURGE.id)) {
-						this.badLifeSurges++
-					}
-				}
-			}
 		}
 	}
 
@@ -106,48 +89,6 @@ export default class Buffs extends Module {
 	}
 
 	private onComplete() {
-		this.checklist.add(new Rule({
-			name: <Trans id="drg.buffs.checklist.name">Keep {ACTIONS.DISEMBOWEL.name} up</Trans>,
-			description: <Trans id="drg.buffs.checklist.description">
-				<ActionLink {...ACTIONS.DISEMBOWEL}/> provides a 10% boost to your personal damage and should always be kept up.
-			</Trans>,
-			displayOrder: DISPLAY_ORDER.DISEMBOWEL,
-			requirements: [
-				new Requirement({
-					name: <Trans id="drg.buffs.checklist.requirement.name"><ActionLink {...ACTIONS.DISEMBOWEL}/> uptime</Trans>,
-					percent: () => this.getDisembowelUptimePercent(),
-				}),
-			],
-		}))
-
-		this.suggestions.add(new TieredSuggestion({
-			icon: ACTIONS.LIFE_SURGE.icon,
-			content: <Trans id="drg.buffs.suggestions.life-surge.content">
-				Avoid using <ActionLink {...ACTIONS.LIFE_SURGE}/> on any GCD that isn't <ActionLink {...ACTIONS.FULL_THRUST}/> or a 5th combo hit. Any other combo action will have significantly less potency, losing a lot of the benefit of the guaranteed crit.
-			</Trans>,
-			tiers: {
-				1: SEVERITY.MINOR,
-				2: SEVERITY.MEDIUM,
-				4: SEVERITY.MAJOR,
-			},
-			value: this.badLifeSurges,
-			why: <Trans id="drg.buffs.suggestions.life-surge.why">
-				You used {ACTIONS.LIFE_SURGE.name} on a non-optimal GCD <Plural value={this.badLifeSurges} one="# time" other="# times"/>.
-			</Trans>,
-		}))
-
-		if (this.soloDragonSight) {
-			this.suggestions.add(new Suggestion({
-				icon: ACTIONS.DRAGON_SIGHT.icon,
-				content: <Trans id="drg.buffs.suggestions.solo-ds.content">
-					Although it doesn't impact your personal DPS, try to always use <ActionLink {...ACTIONS.DRAGON_SIGHT} /> on a partner in group content so that someone else can benefit from the damage bonus too.
-				</Trans>,
-				severity: SEVERITY.MINOR,
-				why: <Trans id="drg.buffs.suggestions.solo-ds.why">
-					At least 1 of your Dragon Sight casts didn't have a tether partner.
-				</Trans>,
-			}))
-		}
 		// make a lil graph of life surge uses
 		// get total LS casts
 		const totalLsCasts = this.lifeSurgeCasts.length
@@ -178,7 +119,8 @@ export default class Buffs extends Module {
 		}
 
 		// push other column if bad use
-		if (totalLsCasts - trackedCastCount > 0) {
+		const badLifeSurges = totalLsCasts - trackedCastCount
+		if (badLifeSurges > 0) {
 			const value = totalLsCasts - trackedCastCount
 
 			data.push({
@@ -196,6 +138,49 @@ export default class Buffs extends Module {
 			this.statistics.add(new PieChartStatistic({
 				headings: ['Life Surge Consumer', 'Count', '%'],
 				data,
+			}))
+		}
+
+		this.checklist.add(new Rule({
+			name: <Trans id="drg.buffs.checklist.name">Keep {ACTIONS.DISEMBOWEL.name} up</Trans>,
+			description: <Trans id="drg.buffs.checklist.description">
+				<ActionLink {...ACTIONS.DISEMBOWEL}/> provides a 10% boost to your personal damage and should always be kept up.
+			</Trans>,
+			displayOrder: DISPLAY_ORDER.DISEMBOWEL,
+			requirements: [
+				new Requirement({
+					name: <Trans id="drg.buffs.checklist.requirement.name"><ActionLink {...ACTIONS.DISEMBOWEL}/> uptime</Trans>,
+					percent: () => this.getDisembowelUptimePercent(),
+				}),
+			],
+		}))
+
+		this.suggestions.add(new TieredSuggestion({
+			icon: ACTIONS.LIFE_SURGE.icon,
+			content: <Trans id="drg.buffs.suggestions.life-surge.content">
+				Try to only use <ActionLink {...ACTIONS.LIFE_SURGE} /> on <ActionLink {...ACTIONS.FULL_THRUST} />. In order to keep <ActionLink {...ACTIONS.LIFE_SURGE} /> used on cooldown, it can be used on <ActionLink {...ACTIONS.WHEELING_THRUST} /> if <ActionLink {...ACTIONS.LIFE_SURGE} /> comes off cooldown immediately after <ActionLink {...ACTIONS.FULL_THRUST} />. In multi-target situations, <ActionLink {...ACTIONS.LIFE_SURGE} /> may be used on <ActionLink {...ACTIONS.FANG_AND_CLAW} /> or <ActionLink {...ACTIONS.COERTHAN_TORMENT} />.
+			</Trans>,
+			tiers: {
+				1: SEVERITY.MINOR,
+				2: SEVERITY.MEDIUM,
+				4: SEVERITY.MAJOR,
+			},
+			value: badLifeSurges,
+			why: <Trans id="drg.buffs.suggestions.life-surge.why">
+				You used {ACTIONS.LIFE_SURGE.name} on a non-optimal GCD <Plural value={badLifeSurges} one="# time" other="# times"/>.
+			</Trans>,
+		}))
+
+		if (this.soloDragonSight) {
+			this.suggestions.add(new Suggestion({
+				icon: ACTIONS.DRAGON_SIGHT.icon,
+				content: <Trans id="drg.buffs.suggestions.solo-ds.content">
+					Although it doesn't impact your personal DPS, try to always use <ActionLink {...ACTIONS.DRAGON_SIGHT} /> on a partner in group content so that someone else can benefit from the damage bonus too.
+				</Trans>,
+				severity: SEVERITY.MINOR,
+				why: <Trans id="drg.buffs.suggestions.solo-ds.why">
+					At least 1 of your Dragon Sight casts didn't have a tether partner.
+				</Trans>,
 			}))
 		}
 	}
