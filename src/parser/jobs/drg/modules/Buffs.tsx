@@ -14,6 +14,8 @@ import {EntityStatuses} from 'parser/core/modules/EntityStatuses'
 import {Invulnerability} from 'parser/core/modules/Invulnerability'
 import {Data} from 'parser/core/modules/Data'
 import DISPLAY_ORDER from './DISPLAY_ORDER'
+import _ from 'lodash'
+import {PieChartStatistic, Statistics} from 'parser/core/modules/Statistics'
 
 const BAD_LIFE_SURGE_CONSUMERS: number[] = [
 	ACTIONS.TRUE_THRUST.id,
@@ -32,6 +34,23 @@ const FINAL_COMBO_HITS: number[] = [
 	ACTIONS.WHEELING_THRUST.id,
 ]
 
+// these are the consumers we care to show in the chart
+const CHART_LIFE_SURGE_CONSUMERS: number[] = [
+	ACTIONS.FULL_THRUST.id,
+	ACTIONS.FANG_AND_CLAW.id,
+	ACTIONS.WHEELING_THRUST.id,
+	ACTIONS.COERTHAN_TORMENT.id,
+]
+
+const CHART_COLORS: {[actionId: number]: string} = {
+	[ACTIONS.FULL_THRUST.id]: '#0e81f7',
+	[ACTIONS.FANG_AND_CLAW.id]: '#18cee7',
+	[ACTIONS.WHEELING_THRUST.id]: '#ce1010',
+	[ACTIONS.COERTHAN_TORMENT.id]: '#9452ff',
+}
+
+const OTHER_ACTION_COLOR: string = '#616161'
+
 export default class Buffs extends Module {
 	static handle = 'buffs'
 	static title = t('drg.buffs.title')`Buffs`
@@ -39,6 +58,7 @@ export default class Buffs extends Module {
 	private badLifeSurges: number = 0
 	private fifthGcd: boolean = false
 	private soloDragonSight: boolean = false
+	private lifeSurgeCasts: number[] = []
 
 	@dependency private checklist!: Checklist
 	@dependency private combatants!: Combatants
@@ -46,6 +66,7 @@ export default class Buffs extends Module {
 	@dependency private invuln!: Invulnerability
 	@dependency private suggestions!: Suggestions
 	@dependency private data!: Data
+	@dependency private statistics!: Statistics
 
 	init(){
 		this.addEventHook('cast', {by: 'player'}, this.onCast)
@@ -56,6 +77,11 @@ export default class Buffs extends Module {
 	private onCast(event: CastEvent) {
 		const action = this.data.getAction(event.ability.guid)
 		if (action && action.onGcd) {
+			if (this.combatants.selected.hasStatus(STATUSES.LIFE_SURGE.id)) {
+				// add to cast list
+				this.lifeSurgeCasts.push(action.id)
+			}
+
 			if (BAD_LIFE_SURGE_CONSUMERS.includes(action.id)) {
 				this.fifthGcd = false // Reset the 4-5 combo hit flag on other GCDs
 				if (this.combatants.selected.hasStatus(STATUSES.LIFE_SURGE.id)) {
@@ -122,5 +148,59 @@ export default class Buffs extends Module {
 				</Trans>,
 			}))
 		}
+		// make a lil graph of life surge uses
+		// get total LS casts
+		const totalLsCasts = this.lifeSurgeCasts.length
+
+		// format for graph
+		const data = []
+
+		// count the things we care about (total - tracked should equal bad LS uses)
+		let trackedCastCount = 0
+		for (const actionId of CHART_LIFE_SURGE_CONSUMERS) {
+			const value = this.lifeSurgeCasts.filter(i => actionId === i).length
+
+			// don't put 0s in the chart
+			if (value === 0)
+				continue
+
+			data.push({
+				value,
+				color: CHART_COLORS[actionId],
+				columns: [
+					this.data.getAction(actionId)?.name,
+					value,
+					this.lsCastPercent(value, totalLsCasts),
+				] as const,
+			})
+
+			trackedCastCount += value
+		}
+
+		// push other column if bad use
+		if (totalLsCasts - trackedCastCount > 0) {
+			const value = totalLsCasts - trackedCastCount
+
+			data.push({
+				value,
+				color: OTHER_ACTION_COLOR,
+				columns: [
+					'Other',
+					value,
+					this.lsCastPercent(value, totalLsCasts),
+				] as const,
+			})
+		}
+
+		if (data.length > 0) {
+			this.statistics.add(new PieChartStatistic({
+				headings: ['Used Life Surge On', 'Count', '%'],
+				data,
+			}))
+		}
+	}
+
+	private lsCastPercent(value: number, total: number): string {
+		return ((value / total) * 100).toFixed(2) + '%'
 	}
 }
