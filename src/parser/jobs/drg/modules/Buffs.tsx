@@ -14,7 +14,6 @@ import {EntityStatuses} from 'parser/core/modules/EntityStatuses'
 import {Invulnerability} from 'parser/core/modules/Invulnerability'
 import {Data} from 'parser/core/modules/Data'
 import DISPLAY_ORDER from './DISPLAY_ORDER'
-import _ from 'lodash'
 import {PieChartStatistic, Statistics} from 'parser/core/modules/Statistics'
 
 const BAD_LIFE_SURGE_CONSUMERS: number[] = [
